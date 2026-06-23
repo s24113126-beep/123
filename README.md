@@ -50,3 +50,22 @@ Render 部署設定（建議）
 注意：
 - 請確認 .gitignore 包含 .env 與 node_modules/，不要把敏感資料推上 GitHub。
 - 若不慎已把 .env 推上，請先在 GitHub 刪除該 commit 並立即 rotate（更換）相關密鑰或密碼。
+
+## 自動推送到 GitHub（範例腳本）
+專案根目錄提供一個推送腳本 push_to_github.sh（在 Git Bash、WSL 或 macOS/Linux 執行）：
+
+使用方法：
+1. 開啟終端並切換到專案目錄：
+   cd "c:\Users\user\OneDrive\桌面\test\budget-app"
+
+2. 執行腳本：
+   bash push_to_github.sh
+
+腳本會：
+- 確保 .gitignore 包含 .env 與 node_modules/
+- 從 index 中移除已被誤加入的 .env / node_modules
+- commit 並設定 remote 為 https://github.com/s24113126-beep/123.git
+- 將 main 分支推送到 origin
+
+認證提示：
+- 若使用 HTTPS，請使用 GitHub Personal Access Token（PAT）作為密碼，或先設定 SSH key 並改用 SSH remote。
