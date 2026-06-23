@@ -13,7 +13,12 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const cors = require('cors');
 
-require('dotenv').config();
+// 嘗試選擇性載入 dotenv（生產環境如 Render 會由平台注入 env，若未安裝 dotenv 不會讓程式崩潰）
+try {
+  require('dotenv').config();
+} catch (e) {
+  // dotenv not installed — that's fine on hosting platforms that provide env vars
+}
 
 const authRoutes = require('./routes/auth');
 const recordRoutes = require('./routes/records');
