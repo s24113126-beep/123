@@ -2,6 +2,30 @@
 
 簡單記帳專案（Budget App）。
 
+Render 部署設定（建議）
+1. Build Command：
+   npm install
+   （或使用 npm ci 以確保與 lockfile 一致）
+
+2. Start Command：
+   npm start
+   （請確認 package.json 有 "start": "node server.js"）
+
+3. Environment Variables（於 Render 的 Service > Environment 設定）
+   - MONGODB_URI  （你的 MongoDB 連線字串）
+   - JWT_SECRET   （一組隨機長字串，用於 JWT 簽章）
+   - PORT 可留空（Render 會自動注入），但 server.js 已讀取 process.env.PORT
+
+注意事項
+- .env 請勿推上 GitHub，請在 Render 上透過 Environment 設定真實值。
+- 若部署失敗，查看 Render 的 build / runtime logs，常見問題為：缺少 start script、network/DB 連線錯誤或環境變數未設定。
+- 若要本機測試：
+  1. 在專案根目錄建立 .env（僅本機）：
+     MONGODB_URI=你的連線字串
+     JWT_SECRET=你的秘密
+  2. npm install
+  3. npm start
+
 快速修正 "src refspec main does not match any" 錯誤
 1. 確認目前目錄（專案根目錄）：  
    cd "c:\Users\user\OneDrive\桌面\test\budget-app"

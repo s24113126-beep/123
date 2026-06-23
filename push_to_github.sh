@@ -1,50 +1,65 @@
 #!/bin/bash
-# 在專案根目錄執行： bash push_to_github.sh
-# 注意：請勿把真實 .env 推上 GitHub。若已推上，請先在 GitHub 移除該 commit 並 rotate secrets。
+# 自動化：初始化/清理/commit 並推送到遠端 repository
+# 使用方式（在專案根目錄執行）：
+#   bash push_to_github.sh
+# 建議在 Git Bash 或 WSL / macOS / Linux 執行。
 
-# 1. 進入專案根目錄（請先切換到該目錄）
-# cd "c:\Users\user\OneDrive\桌面\test\budget-app"
+set -e
 
-# 2. 初始化 git（若已是 git repo 可跳過）
-git status >/dev/null 2>&1 || git init
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+REMOTE_URL="https://github.com/s24113126-beep/123.git"
 
-# 3. 設定 user（如尚未設定）
-# git config user.name "Your Name"
-# git config user.email "you@example.com"
+cd "$REPO_DIR"
 
-# 4. 確保 .gitignore 存在且包含 .env 與 node_modules
-echo -e ".env\nnode_modules/\n" >> .gitignore
-git add .gitignore
-git commit -m "ensure .gitignore" --allow-empty || true
+echo "Working directory: $REPO_DIR"
 
-# 5. 若不小心已把 .env 或 node_modules 加入暫存，從 index 中移除但保留本機檔案
+# 初始化 git repo（若尚未）
+if [ ! -d ".git" ]; then
+  echo "Initializing git repository..."
+  git init
+fi
+
+# 確保 .gitignore 包含 .env 與 node_modules/
+if ! grep -q "^\\.env$" .gitignore 2>/dev/null; then
+  echo ".env" >> .gitignore
+fi
+if ! grep -q "^node_modules/" .gitignore 2>/dev/null; then
+  echo "node_modules/" >> .gitignore
+fi
+git add .gitignore || true
+git commit -m "chore: ensure .gitignore" --allow-empty || true
+
+# 若不小心已將敏感檔案加入索引，從 index 中移除（保留本機檔案）
 if git ls-files --error-unmatch .env >/dev/null 2>&1; then
-  git rm --cached .env
+  echo "Removing .env from git index..."
+  git rm --cached .env || true
 fi
-if [ -d "node_modules" ]; then
-  # 只在 node_modules 被追蹤時才移除
-  if git ls-files --error-unmatch node_modules >/dev/null 2>&1; then
-    git rm -r --cached node_modules
-  fi
+if git ls-files --error-unmatch node_modules >/dev/null 2>&1; then
+  echo "Removing node_modules from git index..."
+  git rm -r --cached node_modules || true
 fi
 
-# 6. 新增並 commit 所有檔案
+# 新增全部檔案並 commit（若沒有變更，建立一個 empty commit 作為 initial）
 git add .
-git commit -m "Initial commit" || echo "Nothing to commit"
-
-# 7. 設定 remote（若 remote 已存在，改用 set-url）
-REMOTE="https://github.com/s24113126-beep/123.git"
-if git remote get-url origin >/dev/null 2>&1; then
-  git remote set-url origin "$REMOTE"
+if git diff --staged --quiet; then
+  echo "No staged changes. Creating an empty initial commit..."
+  git commit --allow-empty -m "chore: initial commit"
 else
-  git remote add origin "$REMOTE"
+  git commit -m "chore: prepare repo for push" || echo "Commit failed or nothing to commit"
 fi
 
-# 8. 推送到 main（若要使用 master，請改為 master）
+# 設定 remote
+if git remote get-url origin >/dev/null 2>&1; then
+  echo "Remote origin exists, setting URL to $REMOTE_URL"
+  git remote set-url origin "$REMOTE_URL"
+else
+  echo "Adding remote origin $REMOTE_URL"
+  git remote add origin "$REMOTE_URL"
+fi
+
+# 切換到 main 並推送
 git branch -M main
-echo "推送到遠端，系統會要求輸入 GitHub 認證（建議使用 PAT 或 SSH）"
+echo "Pushing to origin main (you may be prompted for credentials - use PAT if using HTTPS)"
 git push -u origin main
 
-# 若出現認證問題：請使用 GitHub PAT 或設定 SSH key
-# 範例（使用 PAT，安全性較低，僅示範）：
-# git remote set-url origin https://<USERNAME>:<PERSONAL_ACCESS_TOKEN>@github.com/s24113126-beep/123.git
+echo "Done. Check your GitHub repo: $REMOTE_URL"

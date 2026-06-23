@@ -1,3 +1,4 @@
+// Render 部署建議：Build Command = npm install（或 npm ci）；Start Command = npm start
 // Git push 提示：若出現 "src refspec main does not match any" 請在專案根目錄執行：
 // git add .
 // git commit -m "initial commit"                # 若沒有檔案可改用 --allow-empty
