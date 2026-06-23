@@ -93,6 +93,50 @@ app.use('/api/records', recordsRouter);
 const publicDir = path.join(__dirname, 'public');
 const indexPath = path.join(publicDir, 'index.html');
 
+// 新增：針對常見前端資源提供明確回應，缺檔時回傳可見的提示（方便在瀏覽器直接診斷）
+app.get('/app.js', (req, res) => {
+  const p = path.join(publicDir, 'app.js');
+  if (fs.existsSync(p)) return res.sendFile(p);
+  return res.status(404).send(`/* Missing public/app.js
+Please add public/app.js to your repository, commit and push, then redeploy.
+You can check /debug-files to see which files are present. */`);
+});
+
+app.get('/styles.css', (req, res) => {
+  const p = path.join(publicDir, 'styles.css');
+  if (fs.existsSync(p)) return res.sendFile(p);
+  return res.status(404).send(`/* Missing public/styles.css
+Please add public/styles.css to your repository, commit and push, then redeploy.
+You can check /debug-files to see which files are present. */`);
+});
+
+// 新增：簡單日誌與靜態檔存在檢查（部署後可在 Render 的 logs 看到）
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.url}`);
+  // 只檢查 public 下的靜態檔案是否存在，避免干擾 API 路由
+  if (req.method === 'GET' && req.url.startsWith('/')) {
+    const checkPath = path.join(publicDir, req.path === '/' ? 'index.html' : req.path);
+    try {
+      const exists = fs.existsSync(checkPath);
+      console.log(`[STATIC CHECK] ${checkPath} => ${exists}`);
+    } catch (e) {
+      console.warn('[STATIC CHECK] error checking', checkPath, e && e.message);
+    }
+  }
+  next();
+});
+
+// 新增：debug 端點，回傳 public 目錄檔案清單（部署後瀏覽器或 curl 試用）
+app.get('/debug-files', (req, res) => {
+  try {
+    if (!fs.existsSync(publicDir)) return res.status(200).json({ ok: true, files: [], message: 'public directory not found' });
+    const files = fs.readdirSync(publicDir);
+    return res.status(200).json({ ok: true, files });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 if (!fs.existsSync(indexPath)) {
   console.warn('public/index.html not found. Serving placeholder response. 確認 public 資料夾已加入 repo 並包含 index.html');
   app.get('*', (req, res) => {
@@ -113,6 +157,7 @@ if (!fs.existsSync(indexPath)) {
 } else {
   app.use(express.static(publicDir));
   app.get('*', (req, res) => {
+    console.log('Serving index.html');
     res.sendFile(indexPath);
   });
 }
