@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Budget App</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    /* 內嵌 styles.css（簡化版） */
+    body { font-family: Arial, sans-serif; padding:20px; background:#f4f4f4; }
+    .card { background:#fff; padding:12px; margin:8px 0; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .hidden { display:none; }
+    #records { list-style:none; padding:0; margin-top:12px; }
+    #records li { display:flex; justify-content:space-between; padding:8px; background:#fff; margin-bottom:8px; border-radius:6px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .summary { display:flex; gap:16px; margin-bottom:12px; }
+    input, select { padding:8px; margin:4px 0; }
+    button { padding:8px 12px; cursor:pointer; }
+    #message { color:red; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 登入 / 註冊 -->
+    <div id="auth-screen">
+      <h1>Budget App</h1>
+      <div id="message" class="hidden"></div>
+
+      <div id="forms">
+        <div class="card">
+          <h2>登入</h2>
+          <input id="login-email" placeholder="Email" />
+          <input id="login-password" type="password" placeholder="Password" />
+          <button id="login-btn">登入</button>
+        </div>
+
+        <div class="card">
+          <h2>註冊</h2>
+          <input id="reg-email" placeholder="Email" />
+          <input id="reg-password" type="password" placeholder="Password (min 6)" />
+          <button id="reg-btn">註冊</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 記帳頁面 -->
+    <div id="main-screen" class="hidden">
+      <div class="topbar">
+        <h2>我的記帳</h2>
+        <div>
+          <button id="logout-btn">登出</button>
+        </div>
+      </div>
+
+      <div class="summary">
+        <div>總收入: <span id="total-income">0</span></div>
+        <div>總支出: <span id="total-expense">0</span></div>
+        <div>資產剩餘: <span id="net">0</span></div>
+      </div>
+
+      <div class="add-form card">
+        <select id="type">
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+        </select>
+        <select id="category">
+          <option>餐飲</option>
+          <option>交通</option>
+          <option>娛樂</option>
+          <option>其他</option>
+        </select>
+        <input id="amount" type="number" placeholder="金額" />
+        <input id="note" placeholder="備註" />
+        <button id="add-btn">新增</button>
+      </div>
+
+      <ul id="records"></ul>
+    </div>
+  </div>
+
+  <script>
+    // 內嵌精簡版 app.js：基本 SPA 行為（使用 fetch 與 cookie）
+    (function() {
+      const $ = id => document.getElementById(id);
+      const authScreen = $('auth-screen'), mainScreen = $('main-screen');
+      const msgEl = $('message');
+
+      function showMessage(text, timeout=3000) {
+        msgEl.textContent = text;
+        msgEl.classList.remove('hidden');
+        setTimeout(()=> msgEl.classList.add('hidden'), timeout);
+      }
+
+      async function api(path, opts={}) {
+        opts.credentials = 'include';
+        opts.headers = opts.headers || {};
+        if (opts.body && !(opts.body instanceof FormData)) {
+          opts.headers['Content-Type'] = 'application/json';
+          opts.body = JSON.stringify(opts.body);
+        }
+        const res = await fetch('/api' + path, opts);
+        if (res.status === 401) {
+          showAuth();
+          throw new Error('Unauthorized');
+        }
+        return res;
+      }
+
+      function showAuth() {
+        authScreen.classList.remove('hidden');
+        mainScreen.classList.add('hidden');
+      }
+      function showMain() {
+        authScreen.classList.add('hidden');
+        mainScreen.classList.remove('hidden');
+      }
+
+      async function tryInit() {
+        try {
+          const r = await api('/records');
+          if (r.ok) {
+            showMain();
+            const data = await r.json();
+            renderRecords(data);
+          } else showAuth();
+        } catch (e) { showAuth(); }
+      }
+
+      // login
+      $('login-btn').addEventListener('click', async () => {
+        try {
+          const email = $('login-email').value.trim();
+          const password = $('login-password').value;
+          const res = await api('/auth/login', { method:'POST', body:{ email, password } });
+          if (!res.ok) {
+            const err = await res.json();
+            return showMessage(err.message || 'Login failed');
+          }
+          await tryInit();
+        } catch (e) {}
+      });
+
+      // register
+      $('reg-btn').addEventListener('click', async () => {
+        try {
+          const email = $('reg-email').value.trim();
+          const password = $('reg-password').value;
+          if (password.length < 6) return showMessage('密碼至少 6 字元');
+          const res = await api('/auth/register', { method:'POST', body:{ email, password } });
+          if (!res.ok) {
+            const err = await res.json();
+            return showMessage(err.message || 'Register failed');
+          }
+          showMessage('註冊成功，已自動登入', 2000);
+          await tryInit();
+        } catch (e) {}
+      });
+
+      // logout
+      $('logout-btn').addEventListener('click', async () => {
+        await api('/auth/logout', { method:'POST' });
+        showAuth();
+      });
+
+      async function loadRecords() {
+        const res = await api('/records');
+        const data = await res.json();
+        renderRecords(data);
+      }
+
+      function renderRecords(records) {
+        const list = $('records');
+        list.innerHTML = '';
+        let income = 0, expense = 0;
+        records.forEach(r => {
+          const li = document.createElement('li');
+          li.innerHTML = `<div>
+              <strong>${r.category}</strong> <em>${r.note||''}</em><br/>
+              <small>${new Date(r.createdAt).toLocaleString()}</small>
+            </div>
+            <div>
+              <span>${r.type === 'income' ? '+' : '-'}${r.amount}</span>
+              <button data-id="${r._id}">刪除</button>
+            </div>`;
+          list.appendChild(li);
+          if (r.type === 'income') income += r.amount;
+          else expense += r.amount;
+          li.querySelector('button').addEventListener('click', async (e) => {
+            try {
+              const id = e.currentTarget.getAttribute('data-id');
+              const resp = await api('/records/' + id, { method: 'DELETE' });
+              if (!resp.ok) {
+                const err = await resp.json();
+                return showMessage(err.message || '刪除失敗');
+              }
+              li.remove();
+              await loadRecords();
+            } catch (err) {}
+          });
+        });
+        $('total-income').textContent = income;
+        $('total-expense').textContent = expense;
+        $('net').textContent = income - expense;
+      }
+
+      // add
+      $('add-btn').addEventListener('click', async () => {
+        const type = $('type').value;
+        const category = $('category').value;
+        const amount = parseFloat($('amount').value);
+        const note = $('note').value;
+        if (!category || isNaN(amount)) return showMessage('請輸入正確資訊');
+        try {
+          const res = await api('/records', { method:'POST', body:{ type, category, amount, note } });
+          if (!res.ok) {
+            const err = await res.json();
+            return showMessage(err.message || '新增失敗');
+          }
+          await loadRecords();
+          $('amount').value = '';
+          $('note').value = '';
+        } catch (e) {}
+      });
+
+      // debug helper: show what static files server has (useful if Render lost static files)
+      async function checkDebugFiles() {
+        try {
+          const r = await fetch('/debug-files');
+          if (r.ok) {
+            const j = await r.json();
+            console.log('debug-files:', j);
+          }
+        } catch (e) { console.warn('debug-files failed', e.message); }
+      }
+
+      // 初始化
+      checkDebugFiles();
+      tryInit();
+    })();
+  </script>
+</body>
+</html>
