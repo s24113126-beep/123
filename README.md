@@ -69,3 +69,24 @@ Render 部署設定（建議）
 
 認證提示：
 - 若使用 HTTPS，請使用 GitHub Personal Access Token（PAT）作為密碼，或先設定 SSH key 並改用 SSH remote。
+
+快速排查空白頁（Render 部署後點進去顯示空白）
+1. 確認專案有前端檔案（public/index.html）並已加入版本控制：
+   cd "c:\Users\user\OneDrive\桌面\test\budget-app"
+   git status
+   # 若 public/index.html 不在，請把前端檔放到 public/ 並 commit
+   git add public
+   git commit -m "add frontend"
+   git push
+
+2. 在 GitHub repo 檢查 public/index.html 是否存在（如果不存在，Render 無法提供頁面）。
+
+3. 重新在 Render 上部署（Deploy > Manual Deploy，或等待自動部署），並查看部署 logs：
+   - 若 logs 顯示 "public/index.html not found" 或類似訊息，代表前端檔未上傳。
+
+4. 如需本地測試：
+   npm install
+   npm start
+   然後開啟 http://localhost:3000
+
+如果完成上述仍有問題，請貼上 Render 的 runtime logs（包含警告/錯誤），我會協助下一步。

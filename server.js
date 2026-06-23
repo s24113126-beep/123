@@ -12,6 +12,7 @@ const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const cors = require('cors');
+const fs = require('fs');
 
 // 嘗試選擇性載入 dotenv（生產環境如 Render 會由平台注入 env，若未安裝 dotenv 不會讓程式崩潰）
 try {
@@ -89,10 +90,32 @@ app.use('/api/auth', authRouter);
 app.use('/api/records', recordsRouter);
 
 // serve static SPA
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+const publicDir = path.join(__dirname, 'public');
+const indexPath = path.join(publicDir, 'index.html');
+
+if (!fs.existsSync(indexPath)) {
+  console.warn('public/index.html not found. Serving placeholder response. 確認 public 資料夾已加入 repo 並包含 index.html');
+  app.get('*', (req, res) => {
+    res.status(200).send(`<!doctype html>
+      <html><head><meta charset="utf-8"><title>App not deployed</title></head>
+      <body style="font-family:Arial,sans-serif;padding:24px;">
+        <h1>應用未部署（前端檔案遺失）</h1>
+        <p>public/index.html 不存在。請確認已將前端檔案加入 repository 並推上 GitHub，然後重新部署。</p>
+        <p>建議步驟：</p>
+        <ol>
+          <li>在專案根目錄放置 <code>public/index.html</code>（或完整 public 資料夾）</li>
+          <li>git add public && git commit -m "add frontend" && git push</li>
+          <li>在 Render 重新部署</li>
+        </ol>
+        <p>參考 repo README 或檢查 Render logs 以取得更多資訊。</p>
+      </body></html>`);
+  });
+} else {
+  app.use(express.static(publicDir));
+  app.get('*', (req, res) => {
+    res.sendFile(indexPath);
+  });
+}
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
