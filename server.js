@@ -23,6 +23,35 @@ try {
 const authRoutes = require('./routes/auth');
 const recordRoutes = require('./routes/records');
 
+// normalizeRouter: 從各種可能的 module 形態（直接 export / default / router 屬性）取得可用的 Express router
+function normalizeRouter(mod, name) {
+  if (!mod) throw new Error(`${name} module is empty`);
+  // 如果本身就是 router 或 middleware function / router-like object
+  if (typeof mod === 'function' || (typeof mod === 'object' && typeof mod.use === 'function')) return mod;
+  // commonjs -> es module default
+  if (mod.default) {
+    const d = mod.default;
+    if (typeof d === 'function' || (typeof d === 'object' && typeof d.use === 'function')) return d;
+  }
+  // 常見自訂屬性
+  if (typeof mod === 'object') {
+    for (const key of ['router', 'routes', 'defaultRouter']) {
+      if (mod[key] && typeof mod[key].use === 'function') return mod[key];
+    }
+  }
+  throw new Error(`${name} does not export an Express router. Check routes/${name}.js exports.`);
+}
+
+let authRouter, recordsRouter;
+try {
+  authRouter = normalizeRouter(authRoutes, 'auth');
+  recordsRouter = normalizeRouter(recordRoutes, 'records');
+} catch (err) {
+  console.error('Router initialization error:', err.message);
+  // 明確失敗早點結束，方便在 Render logs 找到問題
+  process.exit(1);
+}
+
 const app = express();
 
 // 使用環境變數為優先，避免將敏感字串硬編到程式
@@ -56,8 +85,8 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
-app.use('/api/auth', authRoutes);
-app.use('/api/records', recordRoutes);
+app.use('/api/auth', authRouter);
+app.use('/api/records', recordsRouter);
 
 // serve static SPA
 app.use(express.static(path.join(__dirname, 'public')));
